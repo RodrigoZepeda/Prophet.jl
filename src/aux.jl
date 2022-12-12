@@ -1,4 +1,6 @@
 @doc raw"""
+`get_valid_index()`
+
 Auxiliary function to filter a `DataFrame` and get the index of the rows with 
     invalid values (missing/nothing/nan/infinity) in columns `col`.
 ...
@@ -30,6 +32,8 @@ function get_valid_index(df::DataFrame, col::Union{Symbol, String, Vector{Symbol
 end
 
 @doc raw"
+`drop_invalid()`, `drop_invalid!()`, `keep_invalid()`, `keep_invalid!()`
+
 Function to filter a `DataFrame` and drop (`drop_invalid`) or keep (`keep_invalid`) 
 rows with invalid values (`missing`/`nothing`/`NaN`/`Inf`) in columns `col`.
 
@@ -136,6 +140,8 @@ end
 export keep_invalid!
 
 @doc raw"""
+`set_date()`
+
 Function to attempt to format string or vector entries as `TimeType` (preferably `DateTime`)
 
 ...
@@ -183,6 +189,8 @@ end
 export set_date
 
 @doc raw"""
+`time_diff()`
+
 Function to estimate difference as `date1 - date2`.
 The function attempts to `convert` the difference to `units` via
     `convert(units, (date1 - date2)).value`.
@@ -258,4 +266,3 @@ function time_diff(date1::T, date2::T; units::DataType = Dates.Second) where {T<
     return datedif
 end
 export time_diff
-

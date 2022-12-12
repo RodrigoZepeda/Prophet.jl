@@ -1,4 +1,8 @@
 #Sets model scaling factors using df
+@doc raw"""
+Sets model scaling factors for normalizing the inputs and regressors as
+    well as the time scale of the model.
+"""
 function initialize_scales_fn(m::ProphetModel, initialize_scales::Bool, df::DataFrame)
     if (!initialize_scales)
         return m
@@ -19,10 +23,34 @@ function initialize_scales_fn(m::ProphetModel, initialize_scales::Bool, df::Data
     m.start   = minimum(df.ds)
     m.t_scale = time_diff(maximum(df.ds), m.start; units = Dates.Second)
 
-    
+    if (!isnothing(m.extra_regressors))
+        for name in keys(m.extra_regressors)
+            standardize = m.extra_regressors[name]["standardize"];
+            n_vals      = length(unique(df[!,name]))
 
+            #Don't standardize if unable to estimate variance
+            if (n_vals < 2)
+                standardize = false
+            end
+
+            #Check if binary variables
+            is_binary = (sort(unique(df[!,name])) == [0,1])
+            if (standardize == "auto")
+                if (n_vals == 2 && is_binary)
+                    standardize = false
+                else
+                    standardize = true
+                end
+            end
+
+            if (standardize)               
+                m.extra_regressors[name]["μ"] = mean(df[!,name])
+                m.extra_regressors[name]["σ"] = std(df[!,name])
+            end
+        end
+    end
 end
-
+export initialize_scales_fn
 
 function setup_dataframe(m::ProphetModel, df::DataFrame; initialize_scales::Bool = false)
 
@@ -72,13 +100,42 @@ function setup_dataframe(m::ProphetModel, df::DataFrame; initialize_scales::Bool
     sort!(df, :ds)
 
     m = initialize_scales_fn(m, initialize_scales, df)
+
+    if (m.logistic_floor)
+        if !("floor" in names(df))
+            error("Expected column 'floor' in DataFrame")
+        end
+    else
+        df[!,:floor] .= 0
+    end
         
-        
+    if (m.growth == "logistic")
+        if !("cap" in names(df))
+            error("Capacities column 'cap' must be supplied for logistic growth in DataFrame")
+        end
+
+        if (any(df[!,:cap] .<= df[!,:floor]))
+            error("cap must be greater than floor (which defaults to 0)")
+        end
+
+        df[!,:cap_scaled] = (df[!,:cap] - df[!,:floor]) ./ m.y_scale;
+
     end
 
+    df[!,:t] = time_diff(df[!,:ds], m.start, Dates.Second) ./ m.t_scale
 
+    if ("y" in names(df))
+        df[!,:y_scaled] = (df[!,:y] - df[!,:floor]) ./ m.y_scale;
+    end
+
+    for name in keys(m.extra_regressors)
+        df[!,name] = (df[!,name] .- m.extra_regressors[name]["μ"]) ./ m.extra_regressors[name]["σ"]
+    end
+
+    return m, df
 
 end
+export setup_dataframe
 
 function fit_prophet(m::ProphetModel, df::DataFrame; kwargs...)
 

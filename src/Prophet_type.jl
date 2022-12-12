@@ -1,6 +1,7 @@
 @doc raw"""
+`ProphetModel()`
 
-Contructs a `ProphetModel` type of object. 
+Contructs a `ProphetModel` mutable type of object. 
 
 ...
 # Arguments (optional)
@@ -84,6 +85,8 @@ TODO: Create add seasonalty function
     *Default:* `nothing`.
 
 TODO: Some are missing
+- `country_holidays::Union{Nothing, String}`: Two letter code for the country of which to consider the holiday. 
+    Country codes for the holidays follow the Python's holiday package convention (see https://pypi.org/project/holidays/)
 
 - `history::Union{Nothing,DataFrame}`: Set during fitting, `DataFrame` of the input time series. Requires
     at least two columns: `:y`, a column with the time series and `:ds` a column of the time units.
@@ -93,8 +96,6 @@ TODO: Some are missing
     the time units. *Default:* `nothing`.
     
 ...
-
-
 """
 mutable struct ProphetModel
     # String 'linear', 'logistic', or 'flat' to specify a linear,
@@ -190,13 +191,14 @@ mutable struct ProphetModel
 
     changepoints_t::Union{Nothing}
 
-    seasonalities::Union{Nothing,Dict}
+    seasonalities::Union{Nothing,AbstractDict}
 
-    extra_regressors::Union{Nothing,Dict}
+    extra_regressors::Union{Nothing,AbstractDict}
 
-    country_holidays::Union{Nothing}
+    #Country for which to consider the holidays
+    country_holidays::Union{Nothing, String}
 
-    params::Union{Nothing,Dict}
+    params::Union{Nothing,AbstractDict}
 
     #Set during fitting: DataFrame of the input time series
     history::Union{Nothing,DataFrame}
@@ -236,10 +238,10 @@ mutable struct ProphetModel
         logistic_floor::Union{Bool}=false,
         t_scale::Union{Nothing,Real}=nothing,
         changepoints_t::Union{Nothing}=nothing,
-        seasonalities::Union{Nothing,Dict}=nothing,
-        extra_regressors::Union{Nothing,Dict}=nothing,
-        country_holidays::Union{Nothing}=nothing,
-        params::Union{Nothing,Dict}=nothing,
+        seasonalities::Union{Nothing,AbstractDict}=nothing,
+        extra_regressors::Union{Nothing,AbstractDict}=nothing,
+        country_holidays::Union{Nothing, String}=nothing,
+        params::Union{Nothing,AbstractDict}=nothing,
         history::Union{Nothing,DataFrame}=nothing,
         history_dates::Union{Nothing,Vector{<: TimeType},Vector{<: Real}}=nothing,
         train_holiday_names::Union{Nothing}=nothing,
@@ -284,7 +286,16 @@ end
 export ProphetModel
 
 @doc raw"
-Pretty-prints a `ProphetModel` object showing all the parameters and their values
+`show()`
+
+Render a `ProphetModel` object to an I/O stream by showing all the parameters and their values
+...
+# Arguments
+
+- `io::IO`: The I/O stream to which `ProphetModel` will be printed.
+
+- `m::ProphetModel`: A `ProphetModel`
+...
 "
 function Base.show(io::IO, m::ProphetModel)
     stack = CrayonStack()
@@ -302,8 +313,16 @@ function Base.show(io::IO, m::ProphetModel)
         print(io, stack, mfield,"\n")
     end
 end
-#export Base.show
 
+@doc raw"
+`validate_inputs()`
+
+Validates the inputs of a `ProphetModel`
+...
+# Arguments
+- `m::ProphetModel`: A `ProphetModel`
+...
+"
 function validate_inputs(m::ProphetModel)
 
     if !(m.growth in ["linear" "logistic" "flat"])
@@ -366,21 +385,38 @@ function validate_inputs(m::ProphetModel)
             end
         end
 
-
         validate_column_names(m, unique(m.holidays.holiday); check_holidays = false)
-        
+
     end
 end
 export validate_inputs
 
 @doc raw"
+
+`validate_column_names()`
+
 Validates the name of seasonalities, holidays or regressors
+
+...
+# Arguments
+
+- `m::ProphetModel`: A `ProphetModel`.
+
+- `h::Union{String,Vector{String}}`: `String` or `Vector` of strings containing the names
+    of the columns to validate.
+
+- `check_holidays::Bool`: Whether to check holidays for the name (default `true`).
+
+- `check_seasonalities::Bool`: Whether to check seasonality variables for the name (default `true`).
+
+- `check_regressors::Bool`: Whether to check regressor variables for the name (default `true`).
+...
 "
 function validate_column_names(m::ProphetModel, 
-        h::Union{String,Array{String}}; 
+        h::Union{String,Vector{String}}; 
         check_holidays::Bool = true, 
-        check_seasonalities = true, 
-        check_regressors = true)
+        check_seasonalities::Bool = true, 
+        check_regressors::Bool = true)
 
     if (typeof(h) == String)
         h = [h]
@@ -408,7 +444,12 @@ function validate_column_names(m::ProphetModel,
         end
     end
 
-    #TODO: add holiday names
+    if (check_holidays && !isnothing(m.country_holidays))
+        holiday_names = get_holiday_names(m.country_holidays)
+        if (any(in.(h, Ref(holiday_names))))
+            error("Name(s) $(h[in.(h, Ref(holiday_names))]) already used for a holiday in $(m.country_holidays).")
+        end
+    end
 
     if (check_seasonalities && !isnothing(m.seasonalities))
         seasonality_names = keys(m.seasonalities)
