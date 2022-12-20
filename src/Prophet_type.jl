@@ -189,11 +189,11 @@ mutable struct ProphetModel
     #t_scale = max(df.ds) - min(df.ds) in seconds
     t_scale::Union{Nothing,<: Real}
 
-    changepoints_t::Union{Nothing}
+    changepoints_t::Union{Nothing, Vector{<: Real}}
 
-    seasonalities::Union{Nothing,AbstractDict}
+    seasonalities::AbstractDict
 
-    extra_regressors::Union{Nothing,AbstractDict}
+    extra_regressors::AbstractDict
 
     #Country for which to consider the holidays
     country_holidays::Union{Nothing, String}
@@ -208,9 +208,9 @@ mutable struct ProphetModel
 
     train_holiday_names::Union{Nothing}
 
-    train_component_cols::Union{Nothing}
+    train_component_cols::Union{Nothing, DataFrame}
 
-    component_modes::Union{Nothing}
+    component_modes::Union{Nothing, Dict}
 
     #Additional arguments for fit
     fit_kwargs::Array
@@ -237,16 +237,16 @@ mutable struct ProphetModel
         y_scale::Union{Nothing,Real}=nothing,
         logistic_floor::Union{Bool}=false,
         t_scale::Union{Nothing,Real}=nothing,
-        changepoints_t::Union{Nothing}=nothing,
-        seasonalities::Union{Nothing,AbstractDict}=nothing,
-        extra_regressors::Union{Nothing,AbstractDict}=nothing,
+        changepoints_t::Union{Nothing, Vector{<: Real}}=nothing,
+        seasonalities::AbstractDict=Dict(),
+        extra_regressors::AbstractDict=Dict(),
         country_holidays::Union{Nothing, String}=nothing,
         params::Union{Nothing,AbstractDict}=nothing,
         history::Union{Nothing,DataFrame}=nothing,
         history_dates::Union{Nothing,Vector{<: TimeType},Vector{<: Real}}=nothing,
         train_holiday_names::Union{Nothing}=nothing,
-        train_component_cols::Union{Nothing}=nothing,
-        component_modes::Union{Nothing}=nothing,
+        train_component_cols::Union{Nothing, DataFrame}=nothing,
+        component_modes::Union{Nothing, Dict}=nothing,
         fit_kwargs::Array=Array{Any}(undef,0))
         return new(
             growth, 
@@ -385,7 +385,7 @@ function validate_inputs(m::ProphetModel)
             end
         end
 
-        validate_column_names(m, unique(m.holidays.holiday); check_holidays = false)
+        validate_column_name(m, unique(m.holidays.holiday); check_holidays = false)
 
     end
 end
@@ -393,7 +393,7 @@ export validate_inputs
 
 @doc raw"
 
-`validate_column_names()`
+`validate_column_name()`
 
 Validates the name of seasonalities, holidays or regressors
 
@@ -412,7 +412,7 @@ Validates the name of seasonalities, holidays or regressors
 - `check_regressors::Bool`: Whether to check regressor variables for the name (default `true`).
 ...
 "
-function validate_column_names(m::ProphetModel, 
+function validate_column_name(m::ProphetModel, 
         h::Union{String,Vector{String}}; 
         check_holidays::Bool = true, 
         check_seasonalities::Bool = true, 
@@ -451,7 +451,7 @@ function validate_column_names(m::ProphetModel,
         end
     end
 
-    if (check_seasonalities && !isnothing(m.seasonalities))
+    if (check_seasonalities && length(m.seasonalities) > 0)
         seasonality_names = keys(m.seasonalities)
         if (any(in.(Symbol.(h), Ref(seasonality_names))))
             error("Name(s) $(h[in.(Symbol.(h), Ref(seasonality_names))]) already used for a seasonality")
@@ -459,7 +459,7 @@ function validate_column_names(m::ProphetModel,
     end
 
     #FIXME: confront line 245 in prophet.R
-    if (check_regressors && !isnothing(m.extra_regressors))
+    if (check_regressors && length(m.extra_regressors) > 0)
         regressor_names = keys(m.extra_regressors)
         if (any(in.(Symbol.(h), Ref(regressor_names))))
             error("Name(s) $(h[in.(Symbol.(h), Ref(regressor_names))]) already used for a regressor")
@@ -467,7 +467,7 @@ function validate_column_names(m::ProphetModel,
     end
 
 end
-export validate_column_names
+export validate_column_name
 
 function prophet(df = nothing; 
     growth::String = "linear",

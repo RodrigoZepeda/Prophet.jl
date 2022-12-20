@@ -9,6 +9,7 @@ module Prophet
     include("Prophet_type.jl")
     include("prophet_model.jl")
     include("make_holidays.jl")
+    include("fit_prophet.jl")
     include("aux.jl")
 
     #Prophet model

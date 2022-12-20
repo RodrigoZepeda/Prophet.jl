@@ -233,15 +233,15 @@ julia> time_diff(ZonedDateTime(2014, 5, 30, 21, tz"UTC-4"),ZonedDateTime(2014, 5
 14400
 ```
 """
-function time_diff(date1::T, date2::T; units::DataType = Dates.Second) where {T<:Union{<: Real, <: TimeType}}
+function time_diff(date1::Union{T,Vector{T}}, date2::Union{T,Vector{T}}; units::DataType = Dates.Second) where {T<:Union{<: Real, <: TimeType}}
     if (typeof(date1) <: Real)
         @warn "Date type is real. Assuming it represents days. Use `DateTime` to better specify dates and avoid this warning"
-        datedif = (date2 - date1)*86_400 #If real assume days and convert to seconds
+        datedif = (date1 .- date2) * 86_400 #If real assume days and convert to seconds
     else 
         try
-            datedif = convert(units, (date1 - date2)).value
+            datedif = getfield.(convert.(units, (date1 .- date2)),  :value)
         catch e
-            datedif = convert(Dates.Millisecond, Dates.CompoundPeriod(date1 - date2)).value
+            datedif = getfield.(convert.(Dates.Millisecond, (date1 .- date2)), :value)
             if (units == Dates.Second)
                 datedif = datedif / 1_000
             elseif (units == Dates.Minute)
